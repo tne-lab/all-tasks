@@ -1,10 +1,10 @@
 from enum import Enum
 
 from Tasks.TaskSequence import TaskSequence
-from Tasks.Raw import Raw
-from Tasks.ERP import ERP
-from Tasks.ClosedLoop import ClosedLoop
-from Tasks.PMA import PMA
+from ..Tasks.Raw import Raw
+from ..Tasks.ERP import ERP
+from ..Tasks.ClosedLoop import ClosedLoop
+from ..Tasks.PMA import PMA
 
 
 class ClosedLoopSequence(TaskSequence):

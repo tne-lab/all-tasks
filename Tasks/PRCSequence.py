@@ -1,8 +1,9 @@
 from enum import Enum
 
 from Tasks.TaskSequence import TaskSequence
-from Tasks.Raw import Raw
-from Tasks.ClosedLoop import ClosedLoop
+from ..Tasks.Raw import Raw
+from ..Tasks.ClosedLoop import ClosedLoop
+
 
 class PRCSequence(TaskSequence):
     """@DynamicAttrs"""
