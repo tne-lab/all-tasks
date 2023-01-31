@@ -1,4 +1,4 @@
-from GUIs.SetShiftGUI import SetShiftGUI
+from ..GUIs.SetShiftGUI import SetShiftGUI
 
 
 class SetShiftCLGUI(SetShiftGUI):
