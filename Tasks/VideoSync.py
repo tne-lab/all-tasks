@@ -24,5 +24,5 @@ class VideoSync(Task):
     def stop(self):
         self.cam.stop()
 
-    def is_complete(self):
-        return False
+    def RECORDING(self, event):
+        pass
