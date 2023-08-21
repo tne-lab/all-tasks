@@ -83,8 +83,9 @@ class SetShift(Task):
         if isinstance(event, PybEvents.StateEnterEvent):
             self.nose_poke_lights[1].toggle(True)
         elif isinstance(event, PybEvents.ComponentChangedEvent) and event.comp is self.nose_pokes[1] and event.comp:
-            self.nose_poke_lights[1].toggle(False)
             self.change_state(self.States.RESPONSE, {"light_location": self.light_sequence[self.cur_trial]})
+        elif isinstance(event, PybEvents.StateExitEvent):
+            self.nose_poke_lights[1].toggle(False)
 
     def RESPONSE(self, event: PybEvents.PybEvent):
         metadata = {}
