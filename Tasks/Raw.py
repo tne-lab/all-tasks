@@ -1,5 +1,6 @@
 from enum import Enum
 
+from Events import PybEvents
 from Tasks.Task import Task
 from Components.Toggle import Toggle
 
@@ -17,13 +18,30 @@ class Raw(Task):
         }
 
     # noinspection PyMethodMayBeStatic
-    def get_constants(self):
+    @staticmethod
+    def get_constants():
         return {
             'duration': 10/60
         }
 
     def init_state(self):
         return self.States.ACTIVE
+    
+    def start(self):
+        self.fan.toggle(True)
+        self.set_timeout("task_complete", self.duration * 60, end_with_state=False)
+
+    def stop(self):
+        self.fan.toggle(False)
+
+    def all_states(self, event: PybEvents.PybEvent) -> bool:
+        if isinstance(event, PybEvents.TimeoutEvent) and event.name == "task_complete":
+            self.complete = True
+            return True
+        return False
+    
+    def ACTIVE(self, event):
+        pass
 
     def is_complete(self):
         return self.time_elapsed() > self.duration * 60

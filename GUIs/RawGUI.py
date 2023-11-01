@@ -8,24 +8,16 @@ from GUIs import Colors
 from GUIs.GUI import GUI
 
 from Elements.InfoBoxElement import InfoBoxElement
-
+from Events import PybEvents
 
 class RawGUI(GUI):
+    """@DynamicAttrs"""
 
-    def __init__(self, task_gui, task):
-        super().__init__(task_gui, task)
-        self.info_boxes = []
+    def initialize(self) -> List[Element]:
+        self.fan = FanElement(self, 210, 20, 40, comp=self.fan)
+        self.ne = InfoBoxElement(self, 372, 125, 50, 15, "NEXT EVENT", 'BOTTOM', ['0'])
+        return [self.fan, self.ne]
 
-        def next_event(self):
-            if task.started:
-                return [str(math.ceil(60*task.duration - task.time_in_state()))]
-            else:
-                return [str(0)]
-
-        ne = InfoBoxElement(self, 372, 125, 50, 15, "NEXT EVENT", 'BOTTOM', ['0'])
-        ne.get_text = MethodType(next_event, ne)
-        self.info_boxes.append(ne)
-        self.fan = FanElement(self, 210, 20, 40, comp=task.fan)
-
-    def get_elements(self) -> List[Element]:
-        return [self.fan, *self.info_boxes]
+    def handle_event(self, event: PybEvents.PybEvent) -> None:
+        super(RawGUI, self).handle_event(event)
+        self.ne.set_text(str(round(60 * self.duration - self.time_elapsed, 2)))
