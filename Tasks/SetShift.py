@@ -1,9 +1,13 @@
 import random
 from enum import Enum
 
+import numpy as np
+
 from Components.BinaryInput import BinaryInput
+from Components.StimJim import StimJim
 from Components.Toggle import Toggle
 from Components.TimedToggle import TimedToggle
+from Components.Video import Video
 from Events import PybEvents
 
 from Tasks.Task import Task
@@ -24,7 +28,9 @@ class SetShift(Task):
             'nose_poke_lights': [Toggle, Toggle, Toggle],
             'food': [TimedToggle],
             'house_light': [Toggle],
-            'chamber_light': [Toggle]
+            'chamber_light': [Toggle],
+            'cam': [Video],
+            'stim': [StimJim]
         }
 
     @staticmethod
@@ -33,12 +39,13 @@ class SetShift(Task):
             'max_duration': 90,
             'inter_trial_interval': 7,
             'response_duration': 3,
-            'n_random_start': 3,
+            'n_random_start': 10,
             'n_random_end': 5,
             'rule_sequence': [0, 1, 0, 2, 0, 1, 0, 2],
             'correct_to_switch': 5,
             'light_sequence': random.sample([True for _ in range(27)] + [False for _ in range(28)], 55),
-            'dispense_time': 0.7
+            'dispense_time': 0.7,
+            'params': {'amp': 0, 'pw': 50, 'period': 7692}
         }
 
     @staticmethod
@@ -62,13 +69,22 @@ class SetShift(Task):
         self.chamber_light.toggle(False)
 
     def start(self):
+        self.cam.start()
         self.set_timeout("task_complete", self.max_duration * 60, end_with_state=False)
         self.chamber_light.toggle(False)
+        self.stim.parametrize(0, [1, 1], round(self.params['period']), 100000000000,
+                              round(self.params['amp']) * np.array([[-1, 1], [-1, 1]]),
+                              round(self.params['pw']) * np.array([1, 1]))
+        self.stim.start(0)
 
     def stop(self):
         self.chamber_light.toggle(True)
         for i in range(3):
             self.nose_poke_lights[i].toggle(False)
+        self.stim.parametrize(0, [1, 1], round(self.params['period']), 1000,
+                              round(self.params['amp']) * np.array([[1, -1], [1, -1]]),
+                              round(self.params['pw']) * np.array([1, 1]))
+        self.cam.stop()
 
     def all_states(self, event: PybEvents.PybEvent) -> bool:
         if isinstance(event, PybEvents.TimeoutEvent) and event.name == "task_complete":
