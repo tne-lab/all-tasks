@@ -30,7 +30,7 @@ class SetShift(Task):
     @staticmethod
     def get_constants():
         return {
-            'max_duration': 90,
+            'max_duration': 0.1,
             'inter_trial_interval': 7,
             'response_duration': 3,
             'n_random_start': 3,

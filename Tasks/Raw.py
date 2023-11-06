@@ -42,6 +42,3 @@ class Raw(Task):
     
     def ACTIVE(self, event):
         pass
-
-    def is_complete(self):
-        return self.time_elapsed() > self.duration * 60
