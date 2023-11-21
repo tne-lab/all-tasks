@@ -29,7 +29,8 @@ class LatencyTest(Task):
         return {
             'single_duration': 10 / 60,
             'many_duration': 10 / 60,
-            'burst_duration': 10 / 60
+            'burst_duration': 10 / 60,
+            'record_one_way_latency': True
         }
 
     @staticmethod
@@ -48,17 +49,18 @@ class LatencyTest(Task):
         self.set_timeout("single_complete", self.single_duration * 60)
 
     def stop(self):
-        print("Single component mean latency:", np.mean(self.single_latencies))
-        print("Single component # events:", len(self.single_latencies))
-        for comp, latencies in self.many_latencies.items():
-            print(f"MANY: {comp} Mean latency:", np.mean(latencies))
-            print("MANY: Number of events:", len(latencies))
+        if self.record_one_way_latency:
+            print("Single component mean latency:", np.mean(self.single_latencies))
+            print("Single component # events:", len(self.single_latencies))
+            for comp, latencies in self.many_latencies.items():
+                print(f"MANY: {comp} Mean latency:", np.mean(latencies))
+                print("MANY: Number of events:", len(latencies))
 
-        for comp, latencies in self.burst_latencies.items():
-            print(f"BURST: {comp} Mean latency:", np.mean(latencies))
-            print("BURST: Number of events:", len(latencies))
+            for comp, latencies in self.burst_latencies.items():
+                print(f"BURST: {comp} Mean latency:", np.mean(latencies))
+                print("BURST: Number of events:", len(latencies))
 
-        self.plot()
+            self.plot()
 
     def all_states(self, event: PybEvents.PybEvent) -> bool:
         if isinstance(event, PybEvents.TimeoutEvent) and event.name == "task_complete":
@@ -72,7 +74,12 @@ class LatencyTest(Task):
             self.change_state(self.States.MANY_COMPONENTS)
             self.latency_comp[0].write({'state': 'many_components'})
         elif isinstance(event, PybEvents.ComponentChangedEvent) and event.comp in self.latency_comp:
-            self.single_latencies.append(time.perf_counter() - event.metadata["t"])
+            if self.record_one_way_latency:
+                rcv_t = time.perf_counter()
+                self.latency_comp[event.index].write(event.metadata)
+                self.single_latencies.append(rcv_t - event.metadata["t"])
+            else:
+                self.latency_comp[event.index].write(event.metadata)
 
     def MANY_COMPONENTS(self, event):
         if isinstance(event, PybEvents.StateEnterEvent):
@@ -81,13 +88,23 @@ class LatencyTest(Task):
             self.change_state(self.States.BURST)
             self.latency_comp[0].write({'state': 'burst'})
         elif isinstance(event, PybEvents.ComponentChangedEvent) and event.comp in self.latency_comp:
-            self.many_latencies[event.comp.id].append(time.perf_counter() - event.metadata["t"])
+            if self.record_one_way_latency:
+                rcv_t = time.perf_counter()
+                self.latency_comp[event.index].write(event.metadata)
+                self.many_latencies[event.comp.id].append(rcv_t - event.metadata["t"])
+            else:
+                self.latency_comp[event.index].write(event.metadata)
 
     def BURST(self, event):
         if isinstance(event, PybEvents.StateEnterEvent):
             self.set_timeout("task_complete", self.burst_duration * 60)
         elif isinstance(event, PybEvents.ComponentChangedEvent) and event.comp in self.latency_comp:
-            self.burst_latencies[event.comp.id].append(time.perf_counter() - event.metadata["t"])
+            if self.record_one_way_latency:
+                rcv_t = time.perf_counter()
+                self.latency_comp[event.index].write(event.metadata)
+                self.burst_latencies[event.comp.id].append(rcv_t - event.metadata["t"])
+            else:
+                self.latency_comp[event.index].write(event.metadata)
 
     def plot(self):
         self.single_latencies = [x * 1000 for x in self.single_latencies]  # Convert to ms
@@ -96,16 +113,23 @@ class LatencyTest(Task):
 
         fig, axs = plt.subplots(3, 1, figsize=(10, 15))
 
-        axs[0].hist(self.single_latencies, bins=20, color='blue')
+        def display_stats(ax, latencies):
+            mean = np.mean(latencies)
+            std_dev = np.std(latencies)
+            stats_text = f'Mean: {mean:.2f} ms, Std Dev: {std_dev:.2f} ms'
+            ax.text(0.6, 0.95, stats_text, transform=ax.transAxes, fontsize=10, verticalalignment='top')
+
+        axs[0].hist(self.single_latencies, bins=50, color='blue')
         axs[0].set_title('Single Component Latencies')
         axs[0].set_xlabel('Latency (ms)')
         axs[0].set_ylabel('Frequency')
+        display_stats(axs[0], self.single_latencies)
 
         # Function to plot for dictionary latencies
         def plot_latencies(ax, latencies, title):
             colors = plt.cm.viridis(np.linspace(0, 1, len(latencies)))
             for (comp_id, lat), color in zip(latencies.items(), colors):
-                ax.hist(lat, bins=20, color=color, alpha=0.7, label=f'Component {comp_id}')
+                ax.hist(lat, bins=50, color=color, alpha=0.7, label=f'Component {comp_id}')
             ax.set_title(title)
             ax.set_xlabel('Latency (ms)')
             ax.set_ylabel('Frequency')
