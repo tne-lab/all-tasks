@@ -1,85 +1,70 @@
-from typing import List
-from types import MethodType
-import math
 from enum import Enum
 
 from Elements.BarPressElement import BarPressElement
 from Elements.IndicatorElement import IndicatorElement
-from Elements.Element import Element
 from Elements.SoundElement import SoundElement
 from Elements.ShockElement import ShockElement
 from Elements.ButtonElement import ButtonElement
 from Elements.InfoBoxElement import InfoBoxElement
-from Events.InputEvent import InputEvent
+from Events import PybEvents
 from GUIs.GUI import GUI
-from ..Tasks.PMA import PMA
 
 
+# noinspection PyAttributeOutsideInit
 class PMAGUI(GUI):
-    class Inputs(Enum):
+    """@DynamicAttrs"""
+    class Events(Enum):
         GUI_PELLET = 0
 
-    def __init__(self, task_gui, task):
-        super().__init__(task_gui, task)
-        self.info_boxes = []
-
-        def feed_mouse_up(self, _):
-            self.clicked = False
-            task.food.toggle(task.dispense_time)
-            task.events.append(InputEvent(task, PMAGUI.Inputs.GUI_PELLET))
-
-        def pellets_text(self):
-            return [str(task.food.count)]
-
-        def presses_text(self):
-            return [str(task.presses)]
-
-        def tone_count_text(self):
-            return [str(task.cur_trial)]
-
-        def reward_available(self):
-            return task.food_light.get_state()
-
-        def next_event(self):
-            if task.state == PMA.States.INTER_TONE_INTERVAL:
-                if task.random:
-                    return [str(math.ceil(task.iti - task.time_in_state()))]
-                else:
-                    return [str(math.ceil(task.time_sequence[task.cur_trial] - task.time_in_state()))]
-            elif task.state == PMA.States.TONE:
-                return [str(math.ceil(task.tone_duration - task.time_in_state()))]
-            elif task.state == PMA.States.SHOCK:
-                return [str(math.ceil(task.shock_duration - task.time_in_state()))]
-            elif task.state == PMA.States.POST_SESSION:
-                return [str(math.ceil(task.post_session_time - task.time_in_state()))]
-            else:
-                return [str(0)]
-
-        def event_countup(self):
-            return [str(round(task.time_elapsed() / 60, 2))]
-
-        self.lever = BarPressElement(self, 77, 25, 100, 90, comp=task.food_lever)
+    def initialize(self):
+        self.iti = 0
+        self.lever = BarPressElement(self, 77, 25, 100, 90, comp=self.food_lever)
         self.feed_button = ButtonElement(self, 129, 170, 50, 20, "FEED")
-        self.feed_button.mouse_up = MethodType(feed_mouse_up, self.feed_button)
-        presses = InfoBoxElement(self, 69, 125, 50, 15, "PRESSES", 'BOTTOM', ['0'])
-        presses.get_text = MethodType(presses_text, presses)
-        self.info_boxes.append(presses)
-        pellets = InfoBoxElement(self, 129, 125, 50, 15, "PELLETS", 'BOTTOM', ['0'])
-        pellets.get_text = MethodType(pellets_text, pellets)
-        self.info_boxes.append(pellets)
-        tone_count = InfoBoxElement(self, 242, 125, 50, 15, "NTONE", 'BOTTOM', ['0'])
-        tone_count.get_text = MethodType(tone_count_text, tone_count)
-        self.info_boxes.append(tone_count)
-        ne = InfoBoxElement(self, 372, 125, 50, 15, "NEXT EVENT", 'BOTTOM', ['0'])
-        ne.get_text = MethodType(next_event, ne)
-        self.info_boxes.append(ne)
-        ec = InfoBoxElement(self, 372, 170, 50, 15, "TIME", 'BOTTOM', ['0'])
-        ec.get_text = MethodType(event_countup, ec)
-        self.info_boxes.append(ec)
+        self.feed_button.mouse_up = lambda _: self.log_gui_event(self.Events.GUI_PELLET)
+        self.presses_elem = InfoBoxElement(self, 69, 125, 50, 15, "PRESSES", 'BOTTOM', ['0'])
+        self.pellets = InfoBoxElement(self, 129, 125, 50, 15, "PELLETS", 'BOTTOM', ['0'])
+        self.ntone = InfoBoxElement(self, 242, 125, 50, 15, "NTONE", 'BOTTOM', ['0'])
+        self.next_event = InfoBoxElement(self, 372, 125, 50, 15, "NEXT EVENT", 'BOTTOM', ['0'])
+        self.time_in_task = InfoBoxElement(self, 372, 170, 50, 15, "TIME", 'BOTTOM', ['0'])
         self.reward_indicator = IndicatorElement(self, 74, 163, 15)
-        self.reward_indicator.on = MethodType(reward_available, self.reward_indicator)
-        self.tone = SoundElement(self, 227, 25, 40, comp=task.tone)
-        self.shocker = ShockElement(self, 357, 25, 40, comp=task.shocker)
+        self.reward_indicator.on = False
+        self.tone_elem = SoundElement(self, 227, 25, 40, comp=self.tone)
+        self.shocker_elem = ShockElement(self, 357, 25, 40, comp=self.shocker)
 
-    def get_elements(self) -> List[Element]:
-        return [self.feed_button, *self.info_boxes, self.lever, self.reward_indicator, self.tone, self.shocker]
+        return [self.feed_button, self.time_in_task, self.next_event, self.ntone, self.pellets, self.presses_elem, self.lever, self.reward_indicator, self.tone_elem, self.shocker_elem]
+
+    def handle_event(self, event: PybEvents.PybEvent) -> None:
+        super(PMAGUI, self).handle_event(event)
+        self.time_in_task.set_text(str(round(self.time_elapsed / 60, 2)))
+        if isinstance(event, PybEvents.StartEvent):
+            if self.type != 'low':
+                self.reward_indicator.on = False
+            else:
+                self.reward_indicator.on = True
+            self.food.count = 0
+            self.presses = 0
+            self.cur_trial = 0
+            self.pellets.set_text(str(self.food.count))
+            self.presses_elem.set_text(str(self.presses))
+            self.ntone.set_text(str(self.cur_trial))
+        elif isinstance(event, PybEvents.ComponentUpdateEvent) and event.comp_id == self.food.id and event.value:
+            self.food.count += 1
+            self.pellets.set_text(str(self.food.count))
+        elif isinstance(event, PybEvents.ComponentUpdateEvent) and event.comp_id == self.food_lever.id and event.value:
+            self.presses += 1
+            self.presses_elem.set_text(str(self.presses))
+        elif isinstance(event, PybEvents.StateEnterEvent) and event.name == "TONE":
+            self.iti = self.tone_duration - self.shock_duration
+            self.reward_indicator.on = True
+        elif isinstance(event, PybEvents.StateEnterEvent) and event.name == "SHOCK":
+            self.iti = self.shock_duration
+        elif isinstance(event, PybEvents.StateExitEvent) and event.name == "SHOCK":
+            if self.type != 'low':
+                self.reward_indicator.on = False
+            self.cur_trial += 1
+            self.ntone.set_text(str(self.cur_trial))
+        elif isinstance(event, PybEvents.StateEnterEvent) and event.name == "INTER_TONE_INTERVAL":
+            self.iti = event.metadata["iti"]
+            self.next_event.set_text(str(round(self.iti)))
+
+        self.next_event.set_text(str(max(0, round(self.iti-self.time_in_state))))
